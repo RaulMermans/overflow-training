@@ -1,0 +1,42 @@
+# Calendar month navigation determinism guardrail.
+# Verifies custom month arrows reliably move visible month forward and backward.
+# Requires: E2E_EMAIL, E2E_PASSWORD, E2E_MONTH_START, E2E_NEXT_MONTH_START
+
+appId: com.workout-tracker.ios
+---
+- launchApp
+- assertVisible:
+    id: login:emailInput
+- inputText:
+    id: login:emailInput
+    text: '${E2E_EMAIL}'
+- inputText:
+    id: login:passwordInput
+    text: '${E2E_PASSWORD}'
+- tapOn:
+    id: login:submitButton
+- extendedWaitFor:
+    visibility:
+      id: workout:primaryActionCard
+    timeout: 15000
+- tapOn: 'Calendar'
+- extendedWaitFor:
+    visibility:
+      id: calendar:monthLabel
+    timeout: 5000
+- extendedWaitFor:
+    visibility:
+      id: 'calendar:day:${E2E_MONTH_START}'
+    timeout: 8000
+- tapOn:
+    id: calendar:monthNext
+- extendedWaitFor:
+    visibility:
+      id: 'calendar:day:${E2E_NEXT_MONTH_START}'
+    timeout: 8000
+- tapOn:
+    id: calendar:monthPrev
+- extendedWaitFor:
+    visibility:
+      id: 'calendar:day:${E2E_MONTH_START}'
+    timeout: 8000

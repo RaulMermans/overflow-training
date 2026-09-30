@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Overflow",
+    "slug": "workout-tracker-ios",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.workout-tracker.ios",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Overflow to access your photo library for progress check-in photos.",
+          "cameraPermission": "Allow Overflow to access your camera to take progress check-in photos.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-localization"
+    ],
+    "scheme": "workout-tracker-ios",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "<EAS_PROJECT_ID>"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/<EAS_PROJECT_ID>"
+    }
+  }
+}

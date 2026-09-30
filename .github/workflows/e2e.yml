@@ -1,0 +1,202 @@
+# E2E Golden Flows — manual
+# Runs Maestro flows against iOS Simulator. Uses dedicated E2E Supabase project.
+# Secrets: SUPABASE_URL_E2E, SUPABASE_ANON_KEY_E2E, SUPABASE_SERVICE_ROLE_KEY_E2E, E2E_TEST_PASSWORD
+
+name: E2E Golden Flows
+
+on:
+  # Manual only: requires a dedicated E2E Supabase project and macOS runner (see docs/E2E_GOLDEN_FLOWS.md).
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-golden-flows:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      SUPABASE_URL_E2E: ${{ secrets.SUPABASE_URL_E2E }}
+      SUPABASE_ANON_KEY_E2E: ${{ secrets.SUPABASE_ANON_KEY_E2E }}
+      SUPABASE_SERVICE_ROLE_KEY_E2E: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_E2E }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.maestro/bin:$PATH" && maestro --version
+
+      - name: Create E2E Test User
+        id: create-user
+        run: |
+          npx tsx e2e/helpers/auth.ts create > /tmp/e2e-user.json
+          echo "email=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/e2e-user.json','utf8')).email)")" >> $GITHUB_OUTPUT
+          echo "user_id=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/e2e-user.json','utf8')).userId)")" >> $GITHUB_OUTPUT
+
+      - name: Build and Launch App
+        run: |
+          EXPO_PUBLIC_SUPABASE_URL="${{ secrets.SUPABASE_URL_E2E }}" \
+          EXPO_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY_E2E }}" \
+          npx expo run:ios &
+          sleep 300
+        timeout-minutes: 15
+
+      - name: Run Maestro Golden Flow 1
+        run: |
+          maestro test maestro/flows/golden-login-routine-schedule-workout-progress.yaml \
+            --env E2E_EMAIL="${{ steps.create-user.outputs.email }}" \
+            --env E2E_PASSWORD="${{ secrets.E2E_TEST_PASSWORD }}" \
+            --env E2E_DATE="$(xcrun simctl spawn booted date +%Y-%m-15)"
+        continue-on-error: true
+        id: flow1
+
+      - name: Run Maestro Calendar Month Navigation Flow
+        if: steps.flow1.outcome == 'success'
+        run: |
+          maestro test maestro/flows/calendar-month-navigation-determinism.yaml \
+            --env E2E_EMAIL="${{ steps.create-user.outputs.email }}" \
+            --env E2E_PASSWORD="${{ secrets.E2E_TEST_PASSWORD }}" \
+            --env E2E_MONTH_START="$(xcrun simctl spawn booted date +%Y-%m-01)" \
+            --env E2E_NEXT_MONTH_START="$(xcrun simctl spawn booted date -v+1m +%Y-%m-01)"
+        continue-on-error: true
+        id: flow_month_nav
+
+      - name: Run Maestro Day Detail Single Surface Flow
+        if: steps.flow1.outcome == 'success' && steps.flow_month_nav.outcome == 'success'
+        run: |
+          maestro test maestro/flows/calendar-day-detail-single-surface.yaml \
+            --env E2E_EMAIL="${{ steps.create-user.outputs.email }}" \
+            --env E2E_PASSWORD="${{ secrets.E2E_TEST_PASSWORD }}" \
+            --env E2E_DATE="$(xcrun simctl spawn booted date -v+1d +%F)"
+        continue-on-error: true
+        id: flow_day_surface
+
+      - name: Run Maestro Planned Workout Start Entry Flow
+        if: steps.flow1.outcome == 'success' && steps.flow_month_nav.outcome == 'success' && steps.flow_day_surface.outcome == 'success'
+        run: |
+          maestro test e2e/maestro/calendar_start_planned_workout.yaml \
+            --env E2E_EMAIL="${{ steps.create-user.outputs.email }}" \
+            --env E2E_PASSWORD="${{ secrets.E2E_TEST_PASSWORD }}" \
+            --env E2E_DATE="$(xcrun simctl spawn booted date -v+2d +%F)"
+        continue-on-error: true
+        id: flow_start_entry
+
+      - name: Run Maestro Calendar Plan Start Cohesion Flow
+        if: steps.flow1.outcome == 'success' && steps.flow_month_nav.outcome == 'success' && steps.flow_day_surface.outcome == 'success' && steps.flow_start_entry.outcome == 'success'
+        run: |
+          maestro test maestro/flows/calendar-plan-start-cohesion.yaml \
+            --env E2E_EMAIL="${{ steps.create-user.outputs.email }}" \
+            --env E2E_PASSWORD="${{ secrets.E2E_TEST_PASSWORD }}" \
+            --env E2E_DATE="$(xcrun simctl spawn booted date -v+3d +%F)"
+        continue-on-error: true
+        id: flow_plan_start
+
+      - name: Run Maestro Golden Flow 2
+        if: steps.flow1.outcome == 'success' && steps.flow_month_nav.outcome == 'success' && steps.flow_day_surface.outcome == 'success' && steps.flow_start_entry.outcome == 'success' && steps.flow_plan_start.outcome == 'success'
+        run: |
+          maestro test maestro/flows/golden-offline-workout-sync.yaml \
+            --env E2E_EMAIL="${{ steps.create-user.outputs.email }}" \
+            --env E2E_PASSWORD="${{ secrets.E2E_TEST_PASSWORD }}" \
+            --env E2E_DATE="$(xcrun simctl spawn booted date -v+4d +%F)"
+        continue-on-error: true
+        id: flow2
+
+      - name: Run Maestro Golden Flow 3
+        if: steps.flow2.outcome == 'success'
+        run: |
+          maestro test maestro/flows/golden-logout-login-state-integrity.yaml \
+            --env E2E_EMAIL="${{ steps.create-user.outputs.email }}" \
+            --env E2E_PASSWORD="${{ secrets.E2E_TEST_PASSWORD }}"
+        continue-on-error: true
+        id: flow3
+
+      - name: Cleanup E2E User
+        if: always() && steps.create-user.outputs.user_id != ''
+        run: npx tsx e2e/helpers/cleanup.ts "${{ steps.create-user.outputs.user_id }}"
+
+      - name: Upload Maestro Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-e2e-artifacts
+          path: ~/.maestro/tests/
+          if-no-files-found: ignore
+
+      - name: Fail if any flow failed
+        if: steps.flow1.outcome == 'failure' || steps.flow_month_nav.outcome == 'failure' || steps.flow_day_surface.outcome == 'failure' || steps.flow_start_entry.outcome == 'failure' || steps.flow_plan_start.outcome == 'failure' || steps.flow2.outcome == 'failure' || steps.flow3.outcome == 'failure'
+        run: exit 1
+
+  e2e-pr-calendar-start:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'e2e-calendar-start')
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL_E2E: ${{ secrets.SUPABASE_URL_E2E }}
+      SUPABASE_ANON_KEY_E2E: ${{ secrets.SUPABASE_ANON_KEY_E2E }}
+      SUPABASE_SERVICE_ROLE_KEY_E2E: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_E2E }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.maestro/bin:$PATH" && maestro --version
+
+      - name: Create E2E Test User
+        id: create-user
+        run: |
+          npx tsx e2e/helpers/auth.ts create > /tmp/e2e-user.json
+          echo "email=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/e2e-user.json','utf8')).email)")" >> $GITHUB_OUTPUT
+          echo "user_id=$(node -e "console.log(JSON.parse(require('fs').readFileSync('/tmp/e2e-user.json','utf8')).userId)")" >> $GITHUB_OUTPUT
+
+      - name: Build and Launch App
+        run: |
+          EXPO_PUBLIC_SUPABASE_URL="${{ secrets.SUPABASE_URL_E2E }}" \
+          EXPO_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY_E2E }}" \
+          npx expo run:ios &
+          sleep 300
+        timeout-minutes: 15
+
+      - name: Run Maestro Planned Workout Start Entry Flow (PR Opt-in)
+        run: |
+          maestro test e2e/maestro/calendar_start_planned_workout.yaml \
+            --env E2E_EMAIL="${{ steps.create-user.outputs.email }}" \
+            --env E2E_PASSWORD="${{ secrets.E2E_TEST_PASSWORD }}" \
+            --env E2E_DATE="$(xcrun simctl spawn booted date -v+2d +%F)"
+
+      - name: Cleanup E2E User
+        if: always() && steps.create-user.outputs.user_id != ''
+        run: npx tsx e2e/helpers/cleanup.ts "${{ steps.create-user.outputs.user_id }}"
+
+      - name: Upload Maestro Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-e2e-artifacts-pr-calendar-start
+          path: ~/.maestro/tests/
+          if-no-files-found: ignore

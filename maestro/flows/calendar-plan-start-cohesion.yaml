@@ -1,0 +1,92 @@
+# Calendar plan->start->session cohesion guardrail.
+# Verifies planned start succeeds, session completes, and returning to Calendar
+# shows completed activity while planned-day actions remain available.
+# Requires: E2E_EMAIL, E2E_PASSWORD, E2E_DATE
+
+appId: com.workout-tracker.ios
+---
+- launchApp
+- assertVisible:
+    id: login:emailInput
+- inputText:
+    id: login:emailInput
+    text: '${E2E_EMAIL}'
+- inputText:
+    id: login:passwordInput
+    text: '${E2E_PASSWORD}'
+- tapOn:
+    id: login:submitButton
+- extendedWaitFor:
+    visibility:
+      id: workout:primaryActionCard
+    timeout: 15000
+- tapOn: 'Calendar'
+- extendedWaitFor:
+    visibility:
+      text: 'Today'
+    timeout: 5000
+- extendedWaitFor:
+    visibility:
+      id: 'calendar:day:${E2E_DATE}'
+    timeout: 8000
+- tapOn:
+    id: 'calendar:day:${E2E_DATE}'
+- extendedWaitFor:
+    visibility:
+      id: calendar:daySheet
+    timeout: 5000
+- extendedWaitFor:
+    visibility:
+      id: calendar:addPlanButton
+    timeout: 5000
+- tapOn:
+    id: calendar:addPlanButton
+- extendedWaitFor:
+    visibility:
+      text: 'E2E Golden Routine'
+    timeout: 8000
+- tapOn: 'E2E Golden Routine'
+- extendedWaitFor:
+    visibility:
+      id: calendar:startWorkoutButton
+    timeout: 5000
+- tapOn:
+    id: calendar:startWorkoutButton
+- extendedWaitFor:
+    visibility:
+      id: workoutSession:finishButton
+    timeout: 15000
+- tapOn:
+    id: workoutSession:addSetButton
+- extendedWaitFor:
+    visibility:
+      id: workoutSession:finishButton
+    timeout: 3000
+- tapOn:
+    id: workoutSession:finishButton
+- extendedWaitFor:
+    visibility:
+      id: workoutSession:finishSubmitButton
+    timeout: 5000
+- tapOn:
+    id: workoutSession:finishSubmitButton
+- extendedWaitFor:
+    visibility:
+      id: workout:primaryActionCard
+    timeout: 15000
+- tapOn: 'Calendar'
+- extendedWaitFor:
+    visibility:
+      id: 'calendar:day:${E2E_DATE}'
+    timeout: 8000
+- tapOn:
+    id: 'calendar:day:${E2E_DATE}'
+- extendedWaitFor:
+    visibility:
+      id: calendar:daySheet
+    timeout: 5000
+- extendedWaitFor:
+    visibility:
+      id: calendar:startWorkoutButton
+    timeout: 5000
+- assertVisible: 'Completed session'

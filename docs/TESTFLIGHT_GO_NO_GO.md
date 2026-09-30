@@ -1,0 +1,59 @@
+# TestFlight GO / NO-GO Checklist
+
+All 21 checks must pass before submitting to TestFlight.
+Any failure is a **NO-GO** that must be resolved first.
+
+---
+
+| #   | Check                      | Command / Action                                                                                            | Pass Criteria                                                                                                                                                                                                                                              | Owner                                 |
+| --- | -------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| 1   | Beta preflight passes      | `npm run preflight:beta`                                                                                    | Full preflight passes                                                                                                                                                                                                                                      | Developer (CLI)                       |
+| 2   | Grep gate                  | `grep -r "import.*supabase" app/`                                                                           | 0 matches                                                                                                                                                                                                                                                  | Developer (CLI)                       |
+| 3   | TypeScript compiles        | `npx tsc --noEmit`                                                                                          | 0 errors                                                                                                                                                                                                                                                   | Developer (CLI)                       |
+| 4   | Schema verified            | Run [`SUPABASE_VERIFY_ALL.sql`](./SUPABASE_VERIFY_ALL.sql) in SQL Editor                                    | All 9 sections pass per [`SUPABASE_VERIFY.md`](./SUPABASE_VERIFY.md)                                                                                                                                                                                       | Developer (Supabase Console)          |
+| 5   | RLS enabled                | Included in SQL output (Section 4)                                                                          | 4 tables, all `rowsecurity = true`                                                                                                                                                                                                                         | Developer (Supabase Console)          |
+| 6   | Seed data present          | Included in SQL output (Section 8-9)                                                                        | `exercise_count >= 10`                                                                                                                                                                                                                                     | Developer (Supabase Console)          |
+| 7   | EAS env vars set           | `npx eas-cli env:list --environment production`                                                             | `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` present; also `EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` present when Google Calendar should ship in the build                                                                                    | Developer (CLI)                       |
+| 8   | Apple Team ID configured   | Inspect `eas.json` > `submit.production.ios.appleTeamId`                                                    | Not `YOUR_APPLE_TEAM_ID`                                                                                                                                                                                                                                   | Developer (eas.json)                  |
+| 9   | ASC App ID configured      | Inspect `eas.json` > `submit.production.ios.ascAppId`                                                       | Not `YOUR_APP_STORE_CONNECT_APP_ID`                                                                                                                                                                                                                        | Developer (eas.json)                  |
+| 10  | App record in ASC          | App Store Connect > My Apps                                                                                 | App exists with bundle ID `com.workout-tracker.ios`                                                                                                                                                                                                        | Developer (Apple Console)             |
+| 11  | Auth redirect config       | Supabase Dashboard > Auth > URL Config and Google Cloud OAuth client                                        | Site URL = `https://www.raulmermans.com`; Redirect URLs contain `workout-tracker-ios://login-callback` + `workout-tracker-ios://reset-password`; Google client is `Web application` with redirect URI `https://<project-ref>.supabase.co/auth/v1/callback` | Developer (Supabase + Google Console) |
+| 12  | Preview build succeeds     | `npx eas-cli build --platform ios --profile preview`                                                        | Build completes without error                                                                                                                                                                                                                              | Developer (CLI)                       |
+| 13  | Preview manual QA          | Install on device, run [README.md](../README.md) steps 1-20                                                 | All 20 steps pass                                                                                                                                                                                                                                          | Developer (Device)                    |
+| 14  | First-time walkthrough     | Fresh account on device: Today -> Start -> Add Exercise -> Add Set -> Finish                                | User can complete flow without explanation                                                                                                                                                                                                                 | Developer (Device)                    |
+| 15  | Screenshot matrix complete | Follow [`APP_STORE_SCREENSHOT_MATRIX.md`](./APP_STORE_SCREENSHOT_MATRIX.md)                                 | All required shots captured for 6.7"/6.5" and copy checked                                                                                                                                                                                                 | Developer (Device + ASC)              |
+| 16  | Auth deep-link flows       | From logged-out app: Continue with Google; then trigger reset email > click link > set new password > login | Google returns through `login-callback`; password reset returns through `reset-password`; new Google user can continue into onboarding without creating a password                                                                                         | Developer (Device + Email)            |
+| 17  | Production build succeeds  | `npx eas-cli build --platform ios --profile production`                                                     | Build completes without error                                                                                                                                                                                                                              | Developer (CLI)                       |
+| 18  | Submit to TestFlight       | `npx eas-cli submit --platform ios --profile production`                                                    | Submission accepted by Apple                                                                                                                                                                                                                               | Developer (CLI)                       |
+| 19  | TestFlight processing      | App Store Connect > TestFlight                                                                              | Build appears and processing completes                                                                                                                                                                                                                     | Developer (Apple Console)             |
+| 20  | Export compliance          | App Store Connect > TestFlight > Build                                                                      | Compliance question answered (select "No")                                                                                                                                                                                                                 | Developer (Apple Console)             |
+| 21  | Internal tester install    | TestFlight app on physical device                                                                           | App installs and launches correctly                                                                                                                                                                                                                        | Tester (Device)                       |
+
+---
+
+## GO Criteria
+
+All 21 checks pass. The app is ready for internal TestFlight distribution.
+
+## Owner Legend
+
+| Label                                 | Meaning                                                        |
+| ------------------------------------- | -------------------------------------------------------------- |
+| Developer (CLI)                       | Local terminal command — no external console needed            |
+| Developer (eas.json)                  | File inspection only — no secrets committed                    |
+| Developer (Supabase Console)          | Requires access to Supabase Dashboard                          |
+| Developer (Supabase + Google Console) | Requires access to Supabase Dashboard and Google Cloud Console |
+| Developer (Apple Console)             | Requires access to App Store Connect or developer.apple.com    |
+| Developer (Device)                    | Physical iOS device or Simulator                               |
+| Developer (Device + ASC)              | Device capture + App Store Connect metadata access             |
+| Developer (Device + Email)            | Device + access to test account email                          |
+| Tester (Device)                       | Any TestFlight tester with iOS device                          |
+
+---
+
+## Related Docs
+
+- Open beta gate: [`docs/release/OPEN_BETA_CHECKLIST.md`](./release/OPEN_BETA_CHECKLIST.md)
+- Full release runbook: [`docs/RELEASE_TESTFLIGHT.md`](./RELEASE_TESTFLIGHT.md)
+- One-time EAS setup: [`docs/EAS_SETUP.md`](./EAS_SETUP.md)
+- Schema verification: [`docs/SUPABASE_VERIFY.md`](./SUPABASE_VERIFY.md)

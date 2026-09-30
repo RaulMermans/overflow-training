@@ -1,0 +1,104 @@
+# Golden Flow 2: offline workout → reconnect → sync success
+# NOTE: iOS Simulator does not support real network disable. This flow validates:
+# 1) Complete workout flow
+# 2) Sync pill shows success/idle after completion
+# For real offline testing, use Network Link Conditioner or run on device with airplane mode.
+# Requires: E2E_EMAIL, E2E_PASSWORD, E2E_DATE
+
+appId: com.workout-tracker.ios
+---
+- launchApp
+- assertVisible:
+    id: login:emailInput
+- inputText:
+    id: login:emailInput
+    text: '${E2E_EMAIL}'
+- inputText:
+    id: login:passwordInput
+    text: '${E2E_PASSWORD}'
+- tapOn:
+    id: login:submitButton
+- extendedWaitFor:
+    visibility:
+      id: workout:primaryActionCard
+    timeout: 15000
+- tapOn: 'Start from a routine'
+- extendedWaitFor:
+    visibility:
+      id: routines:newRoutineButton
+    timeout: 5000
+- tapOn:
+    id: routines:newRoutineButton
+- extendedWaitFor:
+    visibility:
+      id: routineNew:nameInput
+    timeout: 5000
+- inputText:
+    id: routineNew:nameInput
+    text: 'E2E Offline Routine'
+- tapOn: 'Add exercise'
+- extendedWaitFor:
+    visibility:
+      id: exerciseSearch:exerciseRow
+    timeout: 8000
+- tapOn:
+    id: exerciseSearch:exerciseRow
+    index: 0
+- tapOn:
+    id: routineNew:saveButton
+- extendedWaitFor:
+    visibility:
+      text: 'E2E Offline Routine'
+    timeout: 10000
+- tapOn: 'Calendar'
+- extendedWaitFor:
+    visibility:
+      id: calendar:monthLabel
+    timeout: 5000
+- extendedWaitFor:
+    visibility:
+      id: 'calendar:day:${E2E_DATE}'
+    timeout: 5000
+- tapOn:
+    id: 'calendar:day:${E2E_DATE}'
+- extendedWaitFor:
+    visibility:
+      id: calendar:addPlanButton
+    timeout: 5000
+- tapOn:
+    id: calendar:addPlanButton
+- extendedWaitFor:
+    visibility:
+      text: 'E2E Offline Routine'
+    timeout: 5000
+- tapOn: 'E2E Offline Routine'
+- extendedWaitFor:
+    visibility:
+      id: calendar:startWorkoutButton
+    timeout: 5000
+- tapOn:
+    id: calendar:startWorkoutButton
+- extendedWaitFor:
+    visibility:
+      id: workoutSession:finishButton
+    timeout: 15000
+- tapOn:
+    id: workoutSession:addSetButton
+- extendedWaitFor:
+    visibility:
+      id: workoutSession:finishButton
+    timeout: 3000
+- tapOn:
+    id: workoutSession:finishButton
+- extendedWaitFor:
+    visibility:
+      id: workoutSession:finishSubmitButton
+    timeout: 5000
+- tapOn:
+    id: workoutSession:finishSubmitButton
+- extendedWaitFor:
+    visibility:
+      id: workout:primaryActionCard
+    timeout: 15000
+- assertVisible:
+    id: syncPill:chip
